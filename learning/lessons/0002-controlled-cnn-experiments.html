@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>在 99% 附近做受控 CNN 实验</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<main>
+  <div class="eyebrow">Lesson 0002 · CNN · No.13–16</div>
+  <h1>在 99% 附近做受控实验</h1>
+  <p class="lead">MNIST 已接近饱和时，“最终准确率再高 0.1%”很可能只是 10 张测试图片或随机种子波动。实验目标应从追分改成分辨机制。</p>
+
+  <section>
+    <h2>先改变评价方式</h2>
+    <div class="grid">
+      <div class="card"><strong>优化器</strong><br>比较达到 98% 所需 epoch、训练时间和 loss 曲线。</div>
+      <div class="card"><strong>正则化</strong><br>比较训练—验证差距，而非只看测试准确率。</div>
+      <div class="card"><strong>稳定性</strong><br>至少运行 3 个随机种子，报告均值与标准差。</div>
+      <div class="card"><strong>鲁棒性</strong><br>比较轻微平移、旋转或噪声下的错误变化。</div>
+    </div>
+    <div class="callout"><strong>测试集不要变成调参集。</strong>用验证集选择方案，最终只在测试集做一次汇报。如果 MNIST 的差异仍太小，后续可用 FashionMNIST 或 CIFAR-10 放大实验信号；这不否定 MNIST，而是承认它已太容易。</div>
+  </section>
+
+  <section>
+    <h2>13. Adam：比较优化速度，不只比终点</h2>
+    <p>Adam 会维护梯度的一阶、二阶移动平均，并给不同参数调整有效步长。官方默认学习率是 <code>1e-3</code>。它可能更快降低 loss，但“更快”不等于“最终泛化一定更好”。<a href="https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html">官方 Adam 文档</a></p>
+    <pre><code># 实验中只替换这一行，其他设置保持不变
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)</code></pre>
+    <p>记录：每轮 loss、每轮验证准确率、达到固定阈值的 epoch 数和墙钟时间。</p>
+  </section>
+
+  <section>
+    <h2>14. BatchNorm：研究激活分布与 train/eval</h2>
+    <p><code>BatchNorm2d(16)</code> 通常放在卷积后、ReLU 前。训练时它使用 mini-batch 统计量并更新运行统计；评估时使用保存的运行统计，因此 <code>model.train()</code> 与 <code>model.eval()</code> 会真正改变行为。<a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html">官方 BatchNorm2d 文档</a></p>
+    <pre><code>nn.Conv2d(1, 16, 3, padding=1),
+nn.BatchNorm2d(16),
+nn.ReLU(),</code></pre>
+    <p>记录：收敛速度、不同 seed 的方差，以及漏掉 <code>eval()</code> 时结果如何变化。</p>
+  </section>
+
+  <section>
+    <h2>15. Dropout：先确认存在过拟合</h2>
+    <p>Dropout 在训练时以概率 <code>p</code> 随机置零部分元素并缩放其余输出；评估时等价于恒等映射。它针对的是共适应和过拟合，不是任何网络都必须添加。<a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html">官方 Dropout 文档</a></p>
+    <pre><code>nn.Linear(32 * 7 * 7, 128),
+nn.ReLU(),
+nn.Dropout(p=0.3),
+nn.Linear(128, 10),</code></pre>
+    <p>如果训练和验证已经同样好，Dropout 可能只让训练变慢。记录训练—验证差距，而不是期待必然涨分。</p>
+  </section>
+
+  <section>
+    <h2>16. 数据增强：把合理不变性写进数据</h2>
+    <p>小幅平移和旋转表达“写歪一点仍是同一数字”。增强只用于训练集，测试集保留原始分布。Torchvision 的 <code>RandomAffine</code> 可以控制旋转、平移、缩放和剪切。<a href="https://docs.pytorch.org/vision/stable/generated/torchvision.transforms.RandomAffine.html">官方 RandomAffine 文档</a></p>
+    <pre><code>train_transform = transforms.Compose([
+    transforms.RandomAffine(degrees=8, translate=(0.08, 0.08)),
+    transforms.ToTensor(),
+])
+
+test_transform = transforms.ToTensor()</code></pre>
+    <p>MNIST 不适合水平翻转：翻转并不是数字类别应保持不变的自然变换。先把增强后的图片画出来，再决定它是否合理。</p>
+  </section>
+
+  <section>
+    <h2>一次只改一个变量</h2>
+    <pre><code>Baseline: SGD，无 BN，无 Dropout，无增强
+Experiment A: 只把 SGD 换成 Adam
+Experiment B: 回到 Baseline，只加入 BatchNorm
+Experiment C: 回到 Baseline，只加入 Dropout
+Experiment D: 回到 Baseline，只加入训练集增强</code></pre>
+    <p>每个实验使用同一数据划分和同一组随机种子。只有这样，“差异来自谁”才有可解释性。</p>
+    <details><summary>先回答：99.0% 与 99.1% 谁更好？</summary><p>单次运行无法确定。测试集 10,000 张时差异只有 10 张，还需要多 seed 方差、验证集表现和错误样本证据。</p></details>
+  </section>
+
+  <section class="callout">
+    <strong>本课的 tangible win：</strong>你能为 Adam、BatchNorm、Dropout 和数据增强分别选对评价指标，并设计一个只改变单一变量的实验。实验结果不清楚时，把表格和曲线交给 Codex 一起判断。
+  </section>
+
+  <nav>
+    上一课：<a href="0001-see-what-cnn-learns.html">看见 CNN 学到了什么</a><br>
+    快查：<a href="../reference/cnn-experiment-guide.html">CNN 观察与实验指南</a>
+  </nav>
+</main>
+</body>
+</html>

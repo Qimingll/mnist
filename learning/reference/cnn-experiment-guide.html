@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CNN 观察与实验指南</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<main>
+  <div class="eyebrow">Reference · CNN</div>
+  <h1>CNN 观察与实验指南</h1>
+  <div class="grid">
+    <div class="card"><strong>卷积核</strong><br><code>model[0].weight</code><br>参数 shape：<code>(C_out,C_in,K,K)</code></div>
+    <div class="card"><strong>特征图</strong><br><code>model[0](image)</code><br>具体输入触发的响应</div>
+    <div class="card"><strong>错误分析</strong><br>MLP 错/CNN 对<br>MLP 对/CNN 错<br>两者都错</div>
+    <div class="card"><strong>Adam</strong><br>看收敛速度、时间、loss 曲线</div>
+    <div class="card"><strong>BatchNorm</strong><br>看稳定性和 train/eval 差异</div>
+    <div class="card"><strong>Dropout</strong><br>先看训练—验证差距是否过大</div>
+    <div class="card"><strong>数据增强</strong><br>只加保持类别语义的轻微变换</div>
+    <div class="card"><strong>99% 天花板</strong><br>多 seed 均值±标准差；必要时换更难数据集</div>
+  </div>
+  <h2>受控实验清单</h2>
+  <ol>
+    <li>固定训练/验证划分和随机种子集合。</li>
+    <li>每次只改变一个组件。</li>
+    <li>记录 loss、训练准确率、验证准确率和时间。</li>
+    <li>报告多个 seed 的均值与标准差。</li>
+    <li>保存并比较错误样本，而非只看一个百分数。</li>
+    <li>使用验证集选方案，测试集只做最终汇报。</li>
+  </ol>
+  <nav>
+    <a href="../lessons/0001-see-what-cnn-learns.html">Lesson 0001</a> ·
+    <a href="../lessons/0002-controlled-cnn-experiments.html">Lesson 0002</a>
+  </nav>
+</main>
+</body>
+</html>

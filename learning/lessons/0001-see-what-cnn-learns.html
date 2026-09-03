@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>看见 CNN 学到了什么</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<main>
+  <div class="eyebrow">Lesson 0001 · CNN · No.10–12</div>
+  <h1>看见 CNN 学到了什么</h1>
+  <p class="lead">准确率只告诉你“答对多少”，卷积核、特征图和错误样本才开始回答“模型为什么这样答”。本课对应 MNIST 项目从能训练到能解释的下一步。</p>
+
+  <section>
+    <h2>1. 卷积核：模型学到的局部检测器</h2>
+    <p>第一层 <code>Conv2d(1, 16, 3)</code> 的权重 shape 是 <code>(16, 1, 3, 3)</code>：16 个独立的卷积核，每个核读取 1 个输入通道中的 3×3 邻域。每个核在整张图上复用，产生一张输出特征图。PyTorch 的定义明确把输入写成 <code>(N, C_in, H, W)</code>，输出写成 <code>(N, C_out, H_out, W_out)</code>；每个输出通道都会对所有输入通道做加权求和。<a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html">官方 Conv2d 文档</a></p>
+    <pre><code># 训练后查看第一层的 16 个卷积核
+kernels = model[0].weight.detach().cpu()  # (16, 1, 3, 3)
+print(kernels.shape)</code></pre>
+    <div class="callout"><strong>别把卷积理解成“修复中心像素”。</strong>输出值是某个局部模式的响应强度。16 个核对同一邻域做 16 种不同加权计算，所以 1 个灰度通道会变成 16 个特征通道。</div>
+  </section>
+
+  <section>
+    <h2>2. 特征图：卷积核在具体数字上发现了什么</h2>
+    <p>卷积核是参数；特征图是参数作用到一张图片后的结果。同一个核面对“1”和“8”会产生不同响应。第一层输出 <code>(1, 16, 28, 28)</code>，意味着一张图得到 16 张响应图。</p>
+    <pre><code>image, label = next(iter(test_loader))
+image = image[:1]
+
+with torch.no_grad():
+    before_relu = model[0](image)       # (1, 16, 28, 28)
+    after_relu = model[1](before_relu)  # 负响应被截为 0
+
+print(before_relu.shape, after_relu.shape)</code></pre>
+    <p>对照卷积前、ReLU 后、池化后的图，分别观察“检测到了什么”“哪些响应被保留”“空间位置怎样被压缩”。官方 CNN 分类教程展示了卷积、池化、展平与全连接的标准数据流。<a href="https://docs.pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html">官方 Training a Classifier 教程</a></p>
+  </section>
+
+  <section>
+    <h2>3. 错误样本：解释 CNN 比 MLP 好在哪里</h2>
+    <p>总体准确率把所有样本压成一个数字。更有解释力的是把样本分成四组：</p>
+    <div class="grid">
+      <div class="card"><strong>两者都对</strong><br>容易样本，不帮助区分模型。</div>
+      <div class="card"><strong>MLP 错、CNN 对</strong><br>重点观察位置偏移和局部笔画。</div>
+      <div class="card"><strong>MLP 对、CNN 错</strong><br>寻找 CNN 新引入的失败模式。</div>
+      <div class="card"><strong>两者都错</strong><br>可能是模糊、歧义或数据本身困难。</div>
+    </div>
+    <p>真正的问题不是“CNN 多对了多少”，而是“它多对的那些图有什么共同结构”。</p>
+  </section>
+
+  <section>
+    <h2>5 分钟练习</h2>
+    <ol>
+      <li>不运行代码，先写出 <code>model[0].weight.shape</code>。</li>
+      <li>选一张数字，预测哪类局部位置会在 ReLU 后保持亮响应。</li>
+      <li>从“MLP 错、CNN 对”中挑 10 张，写出一个共同特征假设。</li>
+    </ol>
+    <details><summary>核对第 1 题</summary><p><code>(16, 1, 3, 3)</code>。16 是输出通道，1 是输入通道，后两个 3 是卷积核高和宽。</p></details>
+  </section>
+
+  <section class="callout">
+    <strong>本课的 tangible win：</strong>你能够区分“卷积核是什么”和“特征图是什么”，并能用错误样本提出一个可检验的模型行为假设。哪里不清楚，直接把图或 shape 发给 Codex 追问。
+  </section>
+
+  <nav>
+    下一课：<a href="0002-controlled-cnn-experiments.html">在 99% 准确率附近做有意义的受控实验</a><br>
+    快查：<a href="../reference/cnn-experiment-guide.html">CNN 观察与实验指南</a>
+  </nav>
+</main>
+</body>
+</html>

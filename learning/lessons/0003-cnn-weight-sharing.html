@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CNN 权重共享：同一个检测器走遍整张图</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<main>
+  <div class="eyebrow">Lesson 0003 · CNN · Weight Sharing</div>
+  <h1>CNN 权重共享：同一个检测器走遍整张图</h1>
+  <p class="lead">本课只解决一个问题：同一条笔画换了位置以后，MLP 为什么会换一组权重，而 CNN 为什么仍能用原来的局部检测器找到它。</p>
+
+  <section class="callout">
+    <strong>一句话结论：</strong>权重共享不是“整层只有一个权重”，而是“同一个输出通道的同一个卷积核，在所有空间位置反复使用同一组权重”。
+  </section>
+
+  <section>
+    <h2>1. 你的 MLP 理解基本正确</h2>
+    <p>MNIST 展平后，左上角像素和右下角像素成为两个不同输入编号，例如 <code>x₁</code> 和 <code>x₇₈₄</code>。全连接层中，每个位置连接到隐藏神经元时都有自己的参数：</p>
+    <div class="formula">h₁ = w₁x₁ + w₂x₂ + ··· + w₇₈₄x₇₈₄ + b</div>
+    <p>如果一条竖线从左边移动到右边，变亮的是另一批 <code>x</code>，因此使用的是另一批 <code>w</code>。MLP 可以通过训练分别学会这些位置，但网络结构没有规定“左边的竖线”和“右边的竖线”应使用同一个检测规则。</p>
+  </section>
+
+  <section>
+    <h2>2. CNN 共享的到底是什么</h2>
+    <p>假设一个 <code>3×3</code> 卷积核学成竖线检测器：</p>
+    <pre><code>-1  2 -1
+-1  2 -1
+-1  2 -1</code></pre>
+    <p>它先在左上区域计算一次，然后向右移动，再用完全相同的 9 个数字计算；移动到图片中央、右下角时仍然不换参数。</p>
+    <pre><code>位置 (0,0)：patch(0,0) × 同一个 kernel → output(0,0)
+位置 (0,1)：patch(0,1) × 同一个 kernel → output(0,1)
+位置 (0,2)：patch(0,2) × 同一个 kernel → output(0,2)
+                         ⋮
+位置 (27,27)：patch(...) × 同一个 kernel → output(27,27)</code></pre>
+    <p>变化的是被观察的 <code>3×3 patch</code>，不变的是卷积核的 9 个权重。PyTorch 官方定义也表明，每个输出通道使用对应的 <code>weight</code> 对输入做二维互相关，空间位置并不会创建一套新参数。<a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html">官方 Conv2d 文档</a></p>
+  </section>
+
+  <section>
+    <h2>3. 放到你的第一层里看</h2>
+    <pre><code>nn.Conv2d(1, 16, kernel_size=3, padding=1)</code></pre>
+    <p>这里不是全层只用一个卷积核，而是有 16 个不同的卷积核：</p>
+    <table>
+      <thead><tr><th>维度</th><th>含义</th><th>是否共享</th></tr></thead>
+      <tbody>
+        <tr><td>16 个输出通道</td><td>16 种不同的局部检测方式</td><td>不同通道之间不共享</td></tr>
+        <tr><td>每个核的 3×3 权重</td><td>一种检测方式的 9 个参数</td><td>在所有空间位置共享</td></tr>
+        <tr><td>28×28 个输出位置</td><td>同一检测器在各位置的响应</td><td>没有各自独立的核</td></tr>
+      </tbody>
+    </table>
+    <p>第一层参数量（暂不计 bias）只有：</p>
+    <div class="formula">16 × 1 × 3 × 3 = 144</div>
+    <p>但这 144 个参数会在整张图的所有位置反复使用。相比之下，<code>Linear(784,128)</code> 有 <code>784×128=100,352</code> 个位置相关权重。</p>
+  </section>
+
+  <section>
+    <h2>4. 笔画移动后究竟发生什么</h2>
+    <div class="grid">
+      <div class="card"><strong>MLP</strong><br>活跃像素编号改变 → 使用另一批连接权重 → 需要从数据中另外学会这个位置。</div>
+      <div class="card"><strong>CNN</strong><br>输入 patch 的位置改变 → 仍使用同一个卷积核 → 特征图中的强响应跟着移动。</div>
+    </div>
+    <p>因此 CNN 第一层更准确的性质叫<strong>平移等变</strong>：</p>
+    <div class="formula">输入中的竖线向右移动 → 对应特征图中的竖线响应也向右移动</div>
+    <p>它不是天然完全“平移不变”。池化、后续卷积和训练数据能增加位置容忍度，但 padding、图片边界以及最后的全连接层仍可能让最终预测受到位置影响。</p>
+  </section>
+
+  <section>
+    <h2>5. backward 时为什么更容易学到通用特征</h2>
+    <p>同一个卷积核在许多位置被使用，所以反向传播时，所有位置对这 9 个共享权重产生的梯度会累加起来：</p>
+    <div class="formula">kernel.grad = 左上位置贡献 + 中央位置贡献 + 右下位置贡献 + ···</div>
+    <p>训练图片中无论竖线出现在左边、中央还是右边，都在共同更新同一个“竖线检测器”。这就是共享参数带来的数据效率：模型不必为每个绝对位置分别重新学习同一种局部模式。</p>
+  </section>
+
+  <section>
+    <h2>立即回忆：不要看答案先说出来</h2>
+    <ol>
+      <li>一条竖线从左边移动到右边，CNN 的卷积核权重会不会换？</li>
+      <li>什么会改变：卷积核本身，还是特征图中强响应的位置？</li>
+      <li><code>Conv2d(1,16,3)</code> 是 16 个核彼此共享，还是每个核分别在空间位置上共享？</li>
+    </ol>
+    <details><summary>展开核对</summary>
+      <p>卷积核不会换；强响应的位置会跟着竖线移动；16 个核彼此不同，每个核分别在整张图的空间位置上复用自己的权重。</p>
+    </details>
+  </section>
+
+  <section class="callout">
+    <strong>本课的 tangible win：</strong>你能用“patch 在变、kernel 不变、response 位置在变”解释权重共享。请把上面三题用自己的话回答给 Codex；回答正确后，才适合把它记为已掌握。
+  </section>
+
+  <nav>
+    上一课：<a href="0001-see-what-cnn-learns.html">看见 CNN 学到了什么</a><br>
+    快查：<a href="../reference/convolution-weight-sharing.html">卷积权重共享速查</a>
+  </nav>
+</main>
+</body>
+</html>

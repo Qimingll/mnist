@@ -12,6 +12,18 @@
   PyTorch 官方自动微分教程。用于把手写 backward 与 `loss.backward()` 对照起来。
 - [Optimizing Model Parameters](https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html)
   PyTorch 官方训练循环教程。用于理解 loss、`zero_grad()`、`backward()` 和 `step()` 的协作关系。
+- [Conv2d](https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html)
+  PyTorch 官方二维卷积 API。用于核对输入/输出通道、权重 shape、padding 和输出空间尺寸。
+- [Training a Classifier](https://docs.pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html)
+  PyTorch 官方 CNN 分类教程。用于对照卷积、池化、展平、全连接、loss 和训练循环的数据流。
+- [Adam](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html)
+  PyTorch 官方 Adam API。用于理解状态、默认学习率和优化器对照实验。
+- [BatchNorm2d](https://docs.pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html)
+  PyTorch 官方二维 BatchNorm API。用于理解 batch 统计量、运行统计量及 train/eval 行为。
+- [Dropout](https://docs.pytorch.org/docs/stable/generated/torch.nn.Dropout.html)
+  PyTorch 官方 Dropout API。用于理解训练时随机置零、缩放和评估时恒等行为。
+- [RandomAffine](https://docs.pytorch.org/vision/stable/generated/torchvision.transforms.RandomAffine.html)
+  Torchvision 官方仿射增强 API。用于设计并核对 MNIST 的小幅旋转和平移实验。
 
 ## Wisdom (Communities)
 
@@ -19,5 +31,5 @@
 
 ## Gaps
 
-- 后续进入 CNN 阶段时，补充 PyTorch 官方卷积网络教程和卷积 shape 参考资料。
-- 后续需要确定是否添加模型保存、验证集划分和可复现实验相关资料。
+- 后续需要补充 PyTorch 官方的可复现实验、验证集划分和模型保存资料。
+- 若开始系统比较 CNN 错误样本，需要补充可靠的模型解释与校准资料。
